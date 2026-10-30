@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>埋藏式月牙肋岔管体形参数计算与绘图程序</title>
+<style>
+  *{box-sizing:border-box;}
+  body{font-family:"Microsoft YaHei","Noto Sans CJK SC","PingFang SC",sans-serif;margin:0;background:#eef1f5;color:#1a1a1a;}
+  h1{font-size:19px;text-align:center;padding:14px;margin:0;background:#1f3a5f;color:#fff;letter-spacing:1px;}
+  .wrap{max-width:1280px;margin:16px auto;padding:0 16px;}
+  .card{background:#fff;border:1px solid #dfe3e8;border-radius:8px;padding:16px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.07);}
+  h2{font-size:15px;margin:0 0 12px;border-left:4px solid #1f3a5f;padding-left:8px;color:#1f3a5f;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;}
+  label{display:flex;flex-direction:column;font-size:12px;color:#555;gap:3px;}
+  input{padding:6px 8px;border:1px solid #c3cad3;border-radius:4px;font-size:13px;width:100%;}
+  input:focus{outline:2px solid #8fb4d9;border-color:#8fb4d9;}
+  button{margin-top:14px;padding:10px 28px;background:#1f3a5f;color:#fff;border:0;border-radius:6px;font-size:15px;cursor:pointer;}
+  button:hover{background:#2b527f;}
+  button.dxf{background:#1a7f37;margin-left:10px;}
+  button.dxf:hover{background:#226b32;}
+  table{border-collapse:collapse;width:100%;font-size:13px;margin-bottom:10px;}
+  th,td{border:1px solid #d5dae0;padding:5px 8px;text-align:center;}
+  th{background:#eef2f7;font-weight:600;}
+  td.name{text-align:left;background:#f7f9fb;font-weight:600;color:#1f3a5f;}
+  td.hl{background:#fff2a8;font-weight:700;color:#8a6d00;}
+  td.disp{background:#fbfcfd;color:#333;}
+  svg{width:100%;height:auto;display:block;background:#fff;}
+  .note{font-size:12px;color:#666;line-height:1.9;}
+  .ok{color:#1a7f37;font-weight:700;}
+  .ng{color:#c0392b;font-weight:700;}
+  details{margin-top:10px;border-top:1px dashed #d5dae0;padding-top:8px;}
+  summary{cursor:pointer;font-size:13px;color:#1f3a5f;font-weight:600;outline:none;}
+  .adv{margin-top:10px;padding:10px;background:#f7f9fb;border-radius:6px;}
+  .adv h3{font-size:12px;margin:10px 0 6px;color:#2b527f;}
+  .adv table{font-size:12px;}
+</style>
+</head>
+<body>
+<h1>埋藏式月牙肋岔管体形参数计算与绘图程序</h1>
+<div class="wrap">
+
+  <div class="card">
+    <h2>一、输入参数</h2>
+    <div class="grid">
+      <label>主管直径 D₁（mm）<input id="D1" type="number" value="2600"></label>
+      <label>次管直径 D₂（mm）<input id="D2" type="number" value="1200"></label>
+      <label>支管直径 D₃（mm）<input id="D3" type="number" value="1200"></label>
+      <label>支管转角 α₀（°）<input id="alpha0" type="number" value="60" step="0.1"></label>
+      <label>公切球直径倍率 k（1.1~1.2）<input id="k" type="number" value="1.2" step="0.01"></label>
+    </div>
+    <div class="note" style="margin-top:10px;">
+      几何约定：每个管段只有 2 个内切圆（D11/D12 等），三管共用公切圆 D0；
+      外管段端线过 l11 左端点、垂直于 a11、且与 D11 相切；l11 与 D11 相切且平行 a11，
+      l12 与 D11、D12 相切，l13 与 D12、公切圆相切；腰线转折点为相邻腰线的交点（非切点）。<br>
+      约束：① 公切球直径 = 1.1~1.2 倍 D11；② α ≤ 12°；③ β=50°~90°；④ 主、次管 γ=10°~15°；⑤ 支管 γ&lt;20°；⑥ 腰线长 &gt;300&nbsp;mm。
+    </div>
+    <details open>
+      <div class="adv" id="advPanel"></div>
+      <div class="note">
+        优化参数：第二内切圆半径 R12/R22/R32、节2 轴线长 a12/a22/a32、节3 轴线长 a13/a23/a33（共 9 项）；<br>
+        半锥顶角由参数反求：A2i=arcsin((Ri2−Ri1)/ai2)、A3i=arcsin((Ri0−Ri2)/ai3)；
+        轴线转角 = 腰线转角的一半（内部按此关系推得，不再单列）；支管段轴线不转折。<br>
+        <b>生成即满足 α = α0 − 2A31 − A33 ≤ 12°</b>（随 α0 自动调整节3 半锥顶角）；
+        修改 D1/D2/D3、α0 或 k 后按「计算并绘制」，优化参数会自动重置为满足约束的可行初值，可在此基础上继续微调。
+      </div>
+    </details>
+    <button onclick="run()">计算并绘制</button>
+    <button class="dxf" onclick="exportDXF()">导出 DXF 文件</button>
+  </div>
+
+  <div class="card">
+    <h2>二、几何参数表</h2>
+    <div id="tableBox"></div>
+    <div id="extraBox"></div>
+    <div class="note" style="margin-top:8px;">
+      第一位下标为管段（1 主管段、2 次管段、3 支管段），第二位下标为节序（1 外节柱面、2 锥管、3 锥管）。
+      涂黄底色 R13、R23、R33 为公切圆半径，三者必相等。
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>三、体形图</h2>
+    <svg id="fig" xmlns="http://www.w3.org/2000/svg"></svg>
+    <div class="note" style="margin-top:8px;">
+      每管 2 个内切圆 + 公切圆 D0；各节边线为相邻内切圆外公切线；红色点划线为轴线 a；端线垂直于轴线并与首圆相切；
+      三条分界线与 6 条绿线同色，共同将整个岔管分成 9 节，其中 E0→E3 线段加宽 3 倍。<br>
+      <span style="color:#1a5fb4;font-weight:bold;">β：分岔角；α0：次、支管夹角。</span>
+     </div>
+  </div>
+
+</div>
+
+<script>
+/* ==================== 工具 ==================== */
+const D2R = Math.PI/180;
+const CIDX=[0.366,0.3725,0.2443];
+const DA2=[5,7,10], DA3=[12.5,14.5,25];
+let LAST_SIG=null;
+let LAST_G=null, LAST_P=null;
+
+function inter(A,B,C,E){
+  const d1=[B[0]-A[0],B[1]-A[1]], d2=[E[0]-C[0],E[1]-C[1]];
+  const den=d1[0]*(-d2[1])-d1[1]*(-d2[0]);
+  if(Math.abs(den)<1e-12) return null;
+  const rx=C[0]-A[0], ry=C[1]-A[1];
+  const t=(rx*(-d2[1])-ry*(-d2[0]))/den;
+  return [A[0]+t*d1[0], A[1]+t*d1[1]];
+}
+function dist(A,B){ return Math.hypot(A[0]-B[0],A[1]-B[1]); }
+function ang(u,v){
+  const c=(u[0]*v[0]+u[1]*v[1])/(Math.hypot(u[0],u[1])*Math.hypot(v[0],v[1]));
+  return Math.acos(Math.max(-1,Math.min(1,c)))*180/Math.PI;
+}
+function tangentNormals(P,r1,Q,r2){
+  const dx=[Q[0]-P[0],Q[1]-P[1]], Dx=Math.hypot(dx[0],dx[1])||1e-9;
+  const uh=[dx[0]/Dx,dx[1]/Dx], nh=[-uh[1],uh[0]];
+  const sn=(r1-r2)/Dx, cs=Math.sqrt(Math.max(0,1-sn*sn));
+  let m1=[sn*uh[0]-cs*nh[0], sn*uh[1]-cs*nh[1]];
+  let m2=[sn*uh[0]+cs*nh[0], sn*uh[1]+cs*nh[1]];
+  if(m1[1]>m2[1]){const t=m1;m1=m2;m2=t;}
+  return [m1,m2];
+}
+const f2 = v => (Math.round(v*100)/100).toFixed(2);
+
+function defaultParams(){
+  const g=id=>parseFloat(document.getElementById(id).value);
+  const R1=[g('D1')/2, g('D2')/2, g('D3')/2], Rs=g('k')*R1[0], a0=g('alpha0');
+  const A2=DA2.slice();
+  let A3=DA3.slice();
+  if(a0 - 2*A3[0] - A3[2] > 12) A3[2] = (a0 - 12) - 2*A3[0];
+  if(A3[2] < A2[2] + 1) A3[2] = A2[2] + 1;
+  const R2=[0,1,2].map(i=>R1[i]+(Rs-R1[i])*CIDX[i]);
+  const a2=[0,1,2].map(i=>(R2[i]-R1[i])/Math.sin(A2[i]*D2R));
+  const a3=[0,1,2].map(i=>(Rs-R2[i])/Math.sin(A3[i]*D2R));
+  return {R2:R2, a2:a2, a3:a3};
+}
+
+/* ==================== 详细信息面板 ==================== */
+function buildAdv(){
+  const opt=[
+    ['第二内切圆半径 R12 / R22 / R32（mm）','R2',[0,0,0]],
+    ['节2 轴线长 a12 / a22 / a32（mm）','a2',[0,0,0]],
+    ['节3 轴线长 a13 / a23 / a33（mm）','a3',[0,0,0]]
+  ];
+  let h='';
+  for(const [title,key,vals] of opt){
+    h+='<h3>'+title+'（主管段 / 次管段 / 支管段）</h3><div class="grid">';
+    for(let i=0;i<3;i++)
+      h+='<label><span>'+(i+1)+'</span><input id="'+key+'_'+i+'" type="number" step="0.0001" value="'+vals[i]+'"></label>';
+    h+='</div>';
+  }
+  document.getElementById('advPanel').innerHTML=h;
+  refreshOpt(true);
+}
+function refreshOpt(force){
+  const g=id=>parseFloat(document.getElementById(id).value);
+  const sig=g('D1')+'|'+g('D2')+'|'+g('D3')+'|'+g('alpha0')+'|'+g('k');
+  if(!force && sig===LAST_SIG) return;
+  const d=defaultParams();
+  const set=(k,arr)=>arr.forEach((v,i)=>{const el=document.getElementById(k+'_'+i); if(el) el.value=v.toFixed(4);});
+  set('R2',d.R2); set('a2',d.a2); set('a3',d.a3);
+  LAST_SIG=sig;
+}
+function readInputs(){
+  const g=id=>parseFloat(document.getElementById(id).value);
+  const arr=k=>[0,1,2].map(i=>g(k+'_'+i));
+  return {D1:g('D1'),D2:g('D2'),D3:g('D3'),alpha0:g('alpha0'),k:g('k'),
+          R2:arr('R2'),a2:arr('a2'),a3:arr('a3')};
+}
+
+/* ==================== 几何计算 ==================== */
+function solve(P){
+  const R1=[P.D1/2,P.D2/2,P.D3/2];
+  const Rs=P.k*R1[0];
+  const R2=P.R2.slice();
+  const R3=[Rs,Rs,Rs];
+  const a3=P.a3.slice();
+  const a2=P.a2.slice();
+  const a1=[R1[0],R1[1],R1[2]];
+  const cl=v=>Math.max(-1,Math.min(1,v));
+  const A2=[0,1,2].map(i=>Math.asin(cl((R2[i]-R1[i])/a2[i]))*180/Math.PI);
+  const A3=[0,1,2].map(i=>Math.asin(cl((Rs-R2[i])/a3[i]))*180/Math.PI);
+  const t1g=[A2[0], A2[1], 0];
+  const t2g=[A3[0]-A2[0], A3[1]-A2[1], 0];
+
+  const th1=[180,0,P.alpha0], sgn=[1,-1,0];
+  const pipes=[];
+  for(let i=0;i<3;i++){
+    const t1=th1[i], s=sgn[i], t2=t1+s*t1g[i], t3=t2+s*t2g[i];
+    const u1=[Math.cos(t1*D2R),Math.sin(t1*D2R)];
+    const u2=[Math.cos(t2*D2R),Math.sin(t2*D2R)];
+    const u3=[Math.cos(t3*D2R),Math.sin(t3*D2R)];
+    const O=[0,0];
+    const C2=[u3[0]*a3[i],u3[1]*a3[i]];
+    const C1=[C2[0]+u2[0]*a2[i],C2[1]+u2[1]*a2[i]];
+    const t3n=tangentNormals(C2,R2[i],O,Rs);
+    const t2n=tangentNormals(C1,R1[i],C2,R2[i]);
+    let n1lo=[-u1[1],u1[0]];
+    if(n1lo[0]*t2n[1][0]+n1lo[1]*t2n[1][1] < 0) n1lo=[-n1lo[0],-n1lo[1]];
+    pipes.push({r:R1[i],R1:R1[i],R2:R2[i],O:O,C1:C1,C2:C2,u1:u1,u2:u2,u3:u3,
+                n1lo:n1lo, n1up:[-n1lo[0],-n1lo[1]],
+                n2lo:t2n[1], n2up:t2n[0], n3lo:t3n[1], n3up:t3n[0], a1:a1[i]});
+  }
+  const res=[];
+  for(let i=0;i<3;i++){
+    const p=pipes[i], C1=p.C1, C2=p.C2, u1=p.u1, R1v=p.R1, R2v=p.R2, O=p.O;
+    const corner=[C1[0]+p.a1*u1[0]+R1v*p.n1lo[0], C1[1]+p.a1*u1[1]+R1v*p.n1lo[1]];
+    const cornerUp=[C1[0]+p.a1*u1[0]+R1v*p.n1up[0], C1[1]+p.a1*u1[1]+R1v*p.n1up[1]];
+    const w2a=[C1[0]+R1v*p.n2lo[0],C1[1]+R1v*p.n2lo[1]];
+    const w2b=[C2[0]+R2v*p.n2lo[0],C2[1]+R2v*p.n2lo[1]];
+    const w3a=[C2[0]+R2v*p.n3lo[0],C2[1]+R2v*p.n3lo[1]];
+    const w3b=[O[0]+Rs*p.n3lo[0],O[1]+Rs*p.n3lo[1]];
+    const V12=inter(corner,[corner[0]-u1[0],corner[1]-u1[1]],w2a,w2b) || corner;
+    const V23=inter(w2a,w2b,w3a,w3b) || w2a;
+    const w2aU=[C1[0]+R1v*p.n2up[0],C1[1]+R1v*p.n2up[1]];
+    const w2bU=[C2[0]+R2v*p.n2up[0],C2[1]+R2v*p.n2up[1]];
+    const w3aU=[C2[0]+R2v*p.n3up[0],C2[1]+R2v*p.n3up[1]];
+    const w3bU=[O[0]+Rs*p.n3up[0],O[1]+Rs*p.n3up[1]];
+    const V12U=inter(cornerUp,[cornerUp[0]-u1[0],cornerUp[1]-u1[1]],w2aU,w2bU) || cornerUp;
+    const V23U=inter(w2aU,w2bU,w3aU,w3bU) || w2aU;
+    res.push({corner:corner,cornerUp:cornerUp,
+              V12:V12,V23:V23,V12U:V12U,V23U:V23U,
+              w2a:w2a,w2b:w2b,w3a:w3a,w3b:w3b,
+              w2aU:w2aU,w2bU:w2bU,w3aU:w3aU,w3bU:w3bU});
+  }
+  const line3=i=>[res[i].w3a,res[i].w3b];
+  const line3up=i=>{const p=pipes[i];return [[p.C2[0]+p.R2*p.n3up[0],p.C2[1]+p.R2*p.n3up[1]],
+                                            [p.O[0]+Rs*p.n3up[0],p.O[1]+Rs*p.n3up[1]]];};
+  const E4=inter(...line3(0),...line3(2)) || res[0].w3a;
+  const E5=inter(...line3(1),...line3up(2)) || res[1].w3a;
+  const l1=[0,1,2].map(i=>dist(res[i].corner,res[i].V12));
+  const l2=[0,1,2].map(i=>dist(res[i].V12,res[i].V23));
+  const l3=[dist(res[0].V23,E4), dist(res[1].V23,E5), dist(res[2].V23,E4)];
+  let beta=ang(pipes[1].u3,pipes[2].u3); if(beta>90) beta=180-beta;
+  const a13=line3(0), a33=line3(2);
+  let alpha=ang([a13[1][0]-a13[0][0],a13[1][1]-a13[0][1]],[a33[1][0]-a33[0][0],a33[1][1]-a33[0][1]]);
+  if(alpha>90) alpha=180-alpha;
+  const gam12=[0,1,2].map(i=>180-ang([res[i].V12[0]-res[i].corner[0],res[i].V12[1]-res[i].corner[1]],
+                                      [res[i].V12[0]-res[i].V23[0],res[i].V12[1]-res[i].V23[1]]));
+  const gam23=[0,1,2].map(i=>180-ang([res[i].V23[0]-res[i].V12[0],res[i].V23[1]-res[i].V12[1]],
+                                      [res[i].V23[0]-res[i].w3b[0],res[i].V23[1]-res[i].w3b[1]]));
+  return {r:R1,Rs:Rs,R1:R1,R2:R2,R3:R3,a1:a1,a2:a2,a3:a3,A2:A2,A3:A3,
+          l1:l1,l2:l2,l3:l3,beta:beta,alpha:alpha,gam12:gam12,gam23:gam23,
+          pipes:pipes,res:res,E4:E4,E5:E5};
+}
+
+/* ==================== 输出 ==================== */
+function fillAdv(G){}
+
+function renderOutput(G,P){
+  const jie=['1（外节）','2（锥管）','3（锥管）'];
+  let h='<table><thead><tr><th style="width:20%">参数</th><th style="width:11%">节</th>'
+       +'<th>主管段 1</th><th>次管段 2</th><th>支管段 3</th></tr></thead><tbody>';
+  const blocks=[['内切圆半径 R（mm）',[G.R1,G.R2,G.R3]],
+                ['轴线长 a（mm）',[G.a1,G.a2,G.a3]],
+                ['腰线长 l（mm）',[G.l1,G.l2,G.l3]]];
+  for(const [name,rows] of blocks){
+    for(let j=0;j<3;j++){
+      h+='<tr>';
+      if(j===0) h+='<td class="name" rowspan="3">'+name+'</td>';
+      h+='<td>'+jie[j]+'</td>';
+      for(let i=0;i<3;i++){
+        const hl=(name.indexOf('半径')>=0 && j===2);
+        h+='<td class="'+(hl?'hl':'')+'">'+f2(rows[j][i])+'</td>';
+      }
+      h+='</tr>';
+    }
+  }
+  h+='</tbody></table>';
+  document.getElementById('tableBox').innerHTML=h;
+
+  const eps=1e-6, chk=c=>c?'<span class="ok">满足</span>':'<span class="ng">不满足</span>';
+  const mn=Math.min.apply(null,G.l1.concat(G.l2,G.l3));
+  let t='<table><thead><tr><th>关键夹角</th><th>数值（°）</th></tr></thead><tbody>'
+       +'<tr><td class="name">α0（支管转角）</td><td>'+f2(P.alpha0)+'</td></tr>'
+       +'<tr><td class="name">α（公切圆主、支管腰线转角）</td><td>'+f2(G.alpha)+'</td></tr>'
+       +'<tr><td class="name">β（分岔角）</td><td>'+f2(G.beta)+'</td></tr>'
+       +'<tr><td class="name">γ12（1、2节腰线转角主/次/支）</td><td>'+f2(G.gam12[0])+' / '+f2(G.gam12[1])+' / '+f2(G.gam12[2])+'</td></tr>'
+       +'<tr><td class="name">γ23（2、3节腰线转角主/次/支）</td><td>'+f2(G.gam23[0])+' / '+f2(G.gam23[1])+' / '+f2(G.gam23[2])+'</td></tr>'
+       +'</tbody></table>';
+  t+='<table><thead><tr><th>约束校核</th><th>结果</th></tr></thead><tbody>'
+    +'<tr><td class="name">① 公切球直径/D11 = '+P.k.toFixed(3)+'（1.10~1.20）</td><td>'+chk(P.k>=1.10-eps&&P.k<=1.20+eps)+'</td></tr>'
+    +'<tr><td class="name">② α = '+f2(G.alpha)+'（≤12）</td><td>'+chk(G.alpha<=12+0.1)+'</td></tr>'
+    +'<tr><td class="name">③ β = '+f2(G.beta)+'（50~90）</td><td>'+chk(G.beta>=50-eps&&G.beta<=90+eps)+'</td></tr>'
+    +'<tr><td class="name">④ 主/次管 γ = '+f2(G.gam12[0])+'/'+f2(G.gam12[1])+'/'+f2(G.gam23[0])+'/'+f2(G.gam23[1])+'（10~15）</td><td>'
+    +chk([G.gam12[0],G.gam12[1],G.gam23[0],G.gam23[1]].every(x=>x>=10-0.1&&x<=15+0.1))+'</td></tr>'
+    +'<tr><td class="name">⑤ 支管 γ = '+f2(G.gam12[2])+'/'+f2(G.gam23[2])+'（&lt;20）</td><td>'+chk(G.gam12[2]<20+eps&&G.gam23[2]<20+eps)+'</td></tr>'
+    +'<tr><td class="name">⑥ 最小腰线 = '+f2(mn)+' mm（&gt;300）</td><td>'+chk(mn>300)+'</td></tr>'
+    +'<tr><td class="name">⑦ 外管端线与第一个内切圆相切</td><td><span class="ok">满足</span></td></tr>'
+    +'</tbody></table>';
+  document.getElementById('extraBox').innerHTML=t;
+}
+
+/* ==================== 绘图 ==================== */
+function renderFig(G,P){
+  const Rs=G.Rs, yTop=-Rs;
+  const dsc=['主管段','次管段','支管段'];
+
+  const wl  = i => [G.res[i].w3a, G.res[i].w3b];
+  const wlu = i => {const p=G.pipes[i];
+    return [[p.C2[0]+p.R2*p.n3up[0],p.C2[1]+p.R2*p.n3up[1]],
+            [p.O[0]+Rs*p.n3up[0],p.O[1]+Rs*p.n3up[1]]];};
+  const L13=wl(0), L23=wl(1), L33L=wl(2), L33R=wlu(2);
+
+  const p13  = inter(L13[0],L13[1],L33L[0],L33L[1]);
+  const E5   = inter(L13[0],L13[1],L23[0],L23[1]);
+  const E3   = inter(L23[0],L23[1],L33R[0],L33R[1]);
+  const E1   = [0,yTop];
+  const E4   = inter(L33R[0],L33R[1],[-1,yTop],[1,yTop]);
+  const E2   = p13;
+  const E0   = inter(E1,E5,E2,E4);
+
+  const pipes2=G.pipes.map((p,i)=>{
+    const r=G.res[i];
+    let lo, up;
+    if(i===0){
+      lo=[r.corner, r.V12, r.V23, p13];
+      up=[r.cornerUp, r.V12U, r.V23U, E1];
+    } else if(i===1){
+      lo=[r.corner, r.V12, r.V23, E3];
+      up=[r.cornerUp, r.V12U, r.V23U, E1];
+    } else {
+      lo=[r.corner, r.V12, r.V23, p13];
+      up=[r.cornerUp, r.V12U, r.V23U, E3];
+    }
+    return {p:p, up:up, lo:lo, poly:up.concat(lo.slice().reverse())};
+  });
+
+  const p2 = G.pipes[1], p3 = G.pipes[2];
+  const A2end = [p2.C1[0] + p2.a1*p2.u1[0], p2.C1[1] + p2.a1*p2.u1[1]];
+  const A3end = [p3.C1[0] + p3.a1*p3.u1[0], p3.C1[1] + p3.a1*p3.u1[1]];
+  const A2mid = [(p2.C1[0]+A2end[0])/2, (p2.C1[1]+A2end[1])/2];
+  const A3mid = [(p3.C1[0]+A3end[0])/2, (p3.C1[1]+A3end[1])/2];
+
+  const u2v = p2.u1, u3v = p3.u1;
+  const denA = u2v[0]*(-u3v[1]) - u2v[1]*(-u3v[0]);
+  let Valpha;
+  if(Math.abs(denA) < 1e-12){
+    Valpha = [(A2end[0]+A3end[0])/2, (A2end[1]+A3end[1])/2];
+  } else {
+    const rx = A3end[0]-A2end[0], ry = A3end[1]-A2end[1];
+    const t = (rx*(-u3v[1]) - ry*(-u3v[0]))/denA;
+    Valpha = [A2end[0]+t*u2v[0], A2end[1]+t*u2v[1]];
+  }
+  const rAlpha0 = dist(Valpha, A2mid);
+  const arrowUp = A2mid;
+
+  const dir3 = [A3mid[0]-Valpha[0], A3mid[1]-Valpha[1]];
+  const len3 = Math.hypot(dir3[0],dir3[1])||1;
+  const u3dir = [dir3[0]/len3, dir3[1]/len3];
+  const arrowDn = [Valpha[0] + rAlpha0*u3dir[0], Valpha[1] + rAlpha0*u3dir[1]];
+
+  const dir2 = [A2mid[0]-Valpha[0], A2mid[1]-Valpha[1]];
+  const len2 = Math.hypot(dir2[0],dir2[1])||1;
+  const u2dir = [dir2[0]/len2, dir2[1]/len2];
+
+  const p2c2 = p2.C2;
+  const a23mid = [(p2c2[0]+0)/2, (p2c2[1]+0)/2];
+  const rBeta = dist([0,0], a23mid);
+
+  let xs=[], ys=[];
+  pipes2.forEach(o=>o.poly.forEach(q=>{xs.push(q[0]);ys.push(q[1]);}));
+  xs.push(-Rs,Rs); ys.push(-Rs,Rs);
+  [Valpha, arrowUp, arrowDn, A2end, A3end, a23mid].forEach(q=>{xs.push(q[0]);ys.push(q[1]);});
+  [[Valpha[0]+rAlpha0, Valpha[1]],[Valpha[0]-rAlpha0, Valpha[1]],
+   [Valpha[0], Valpha[1]+rAlpha0],[Valpha[0], Valpha[1]-rAlpha0]]
+    .forEach(q=>{xs.push(q[0]);ys.push(q[1]);});
+  [[rBeta,0],[-rBeta,0],[0,rBeta],[0,-rBeta]]
+    .forEach(q=>{xs.push(q[0]);ys.push(q[1]);});
+  // 把管段名称文字的位置也纳入包围盒，避免文字被裁切
+  for(let i=0;i<3;i++){
+    const p=G.pipes[i], Dp=[p.C1[0]+p.a1*p.u1[0], p.C1[1]+p.a1*p.u1[1]];
+    xs.push(Dp[0]-p.R1, Dp[0]+p.R1);
+    ys.push(Dp[1]+p.R1*1.5);
+  }
+
+  let x0=Math.min.apply(null,xs), x1=Math.max.apply(null,xs), y0=Math.min.apply(null,ys), y1=Math.max.apply(null,ys);
+  const size0=Math.max(x1-x0,y1-y0);
+  const fs0=size0*0.017, lineH=fs0*1.2;   // 估算字号与行高
+  const padTop=size0*0.004+6;             // 顶部贴紧，减少上部留白
+  const padBottom=lineH*2;                // 文字下方约留 2 行文字空间
+  const padSide=size0*0.08+300;
+  x0-=padSide;x1+=padSide;
+  y0-=padTop;y1+=padBottom;
+  const W=x1-x0,H=y1-y0, fs=fs0, lw=size0*0.0011;
+  const regionFill=['#bcdcf0','#cfe9c6','#f9e2bc'];
+  const outline='#5a6673';
+
+  function clipHalf(poly, ex, ey, dx, dy, keepPos){
+    const sgn=keepPos?1:-1;
+    const f=p=>sgn*(dx*(p[1]-ey)-dy*(p[0]-ex));
+    const out=[];
+    for(let i=0;i<poly.length;i++){
+      const A=poly[i], B=poly[(i+1)%poly.length], fa=f(A), fb=f(B);
+      if(fa>=0) out.push(A);
+      if((fa>=0)!==(fb>=0)){const t=fa/(fa-fb); out.push([A[0]+(B[0]-A[0])*t, A[1]+(B[1]-A[1])*t]);}
+    }
+    return out;
+  }
+  const NC=200, disk=[];
+  for(let i=0;i<NC;i++){const t=i/NC*2*Math.PI; disk.push([Rs*Math.cos(t),Rs*Math.sin(t)]);}
+
+  let g='<rect x="'+x0+'" y="'+y0+'" width="'+W+'" height="'+H+'" fill="#ffffff"/>';
+
+  if(E0&&E1&&E2&&E3){
+    const items=[{k:'1',a:Math.atan2(E1[1]-E0[1],E1[0]-E0[0])},
+                 {k:'2',a:Math.atan2(E2[1]-E0[1],E2[0]-E0[0])},
+                 {k:'3',a:Math.atan2(E3[1]-E0[1],E3[0]-E0[0])}].sort((u,v)=>u.a-v.a);
+    // —— 补片：公切圆与相邻管段腰线在岔角处围成的月牙区，不属于任何管段多边形，需单独填充以消除白色空洞 ——
+    const _tanPt=arr=>arr[1];                     // 腰线在公切圆上的切点（w3b / O+Rs·n₃）
+    const _arcPts=(A,B,M,n)=>{                     // 沿公切圆由 A 经岔角 M 到 B 的圆弧
+      const a0=Math.atan2(A[1],A[0]), a1=Math.atan2(B[1],B[0]), am=Math.atan2(M[1],M[0]);
+      const nrm=x=>{while(x<0)x+=2*Math.PI; while(x>=2*Math.PI)x-=2*Math.PI; return x;};
+      let d=a1-a0; while(d<=-Math.PI)d+=2*Math.PI; while(d>Math.PI)d-=2*Math.PI;
+      const m0=nrm(am-a0);
+      const ok = d>=0 ? (m0<=d+1e-9) : (m0>=2*Math.PI+d-1e-9);
+      if(!ok) d = d>=0 ? d-2*Math.PI : d+2*Math.PI;
+      const out=[]; for(let k=0;k<=n;k++){const a=a0+d*k/n; out.push([Rs*Math.cos(a),Rs*Math.sin(a)]);}
+      return out;
+    };
+    const slivers=[];
+    const addSliver=(Q,lineA,lineB)=>{ if(Q) slivers.push([Q].concat(_arcPts(_tanPt(lineB),_tanPt(lineA),Q,48))); };
+    addSliver(E3,  L23, L33R);   // 次管段下腰线 × 支管段上腰线
+    addSliver(E5,  L13, L23);    // 主管段下腰线 × 次管段下腰线
+    addSliver(p13, L13, L33L);   // 主管段下腰线 × 支管段下腰线
+    const bases=[disk].concat(pipes2.map(o=>o.poly)).concat(slivers);
+    for(let i=0;i<3;i++){
+      const cur=items[i], nxt=items[(i+1)%3];
+      const a1=cur.a, a2=nxt.a+(i===2?Math.PI*2:0);
+      const key=[cur.k,nxt.k].sort().join('');
+      const seg = key==='12'?0 : key==='13'?1 : 2;
+      const dA=[Math.cos(a1),Math.sin(a1)], dB=[Math.cos(a2),Math.sin(a2)];
+      const am=(a1+a2)/2, mx=Math.cos(am), my=Math.sin(am);
+      const keepA=(dA[0]*my-dA[1]*mx)>=0, keepB=(dB[0]*my-dB[1]*mx)>=0;
+      for(const base of bases){
+        let poly=clipHalf(base,E0[0],E0[1],dA[0],dA[1],keepA);
+        poly=clipHalf(poly,E0[0],E0[1],dB[0],dB[1],keepB);
+        if(poly.length>=3)
+          g+='<path d="M '+poly.map(q=>q[0].toFixed(1)+' '+q[1].toFixed(1)).join(' L ')+' Z" fill="'+regionFill[seg]+'" stroke="none"/>';
+      }
+    }
+  }
+
+  pipes2.forEach((o,i)=>{
+    g+='<polyline points="'+o.up.map(q=>q[0].toFixed(1)+','+q[1].toFixed(1)).join(' ')+
+       '" fill="none" stroke="'+outline+'" stroke-width="'+lw.toFixed(2)+'"/>';
+    g+='<polyline points="'+o.lo.map(q=>q[0].toFixed(1)+','+q[1].toFixed(1)).join(' ')+
+       '" fill="none" stroke="'+outline+'" stroke-width="'+lw.toFixed(2)+'"/>';
+  });
+  for(let i=0;i<3;i++){
+    const p=G.pipes[i];
+    g+='<circle cx="'+p.C1[0].toFixed(1)+'" cy="'+p.C1[1].toFixed(1)+'" r="'+p.R1.toFixed(1)+
+       '" fill="none" stroke="#d4a017" stroke-width="'+(lw*0.9).toFixed(2)+'" stroke-dasharray="'+(fs*0.5).toFixed(1)+' '+(fs*0.5).toFixed(1)+'"/>';
+    g+='<circle cx="'+p.C2[0].toFixed(1)+'" cy="'+p.C2[1].toFixed(1)+'" r="'+p.R2.toFixed(1)+
+       '" fill="none" stroke="#d4a017" stroke-width="'+(lw*0.9).toFixed(2)+'" stroke-dasharray="'+(fs*0.5).toFixed(1)+' '+(fs*0.5).toFixed(1)+'"/>';
+  }
+  g+='<circle cx="0" cy="0" r="'+Rs.toFixed(1)+'" fill="none" stroke="#d4a017" stroke-width="'+(lw*1.7).toFixed(2)+
+     '" stroke-dasharray="'+(fs*0.8).toFixed(1)+' '+(fs*0.5).toFixed(1)+'"/>';
+  for(let i=0;i<3;i++){
+    const p=G.pipes[i];
+    const E=[p.C1[0]+p.a1*p.u1[0],p.C1[1]+p.a1*p.u1[1]];
+    g+='<polyline points="'+[E,p.C1,p.C2,p.O].map(q=>q[0].toFixed(1)+','+q[1].toFixed(1)).join(' ')+
+       '" fill="none" stroke="#d81b1b" stroke-width="'+(lw*1.2).toFixed(2)+'" stroke-dasharray="'+(fs*1.2).toFixed(1)+' '+(fs*0.4).toFixed(1)+' '+(fs*0.2).toFixed(1)+' '+(fs*0.4).toFixed(1)+'"/>';
+  }
+  for(let i=0;i<3;i++){
+    const p=G.pipes[i];
+    [p.C1,p.C2].forEach(q=>{
+      g+='<circle cx="'+q[0].toFixed(1)+'" cy="'+q[1].toFixed(1)+'" r="'+(lw*1.6).toFixed(2)+'" fill="#d81b1b"/>';
+    });
+  }
+  g+='<circle cx="0" cy="0" r="'+(lw*1.6).toFixed(2)+'" fill="#d81b1b"/>';
+
+  // 三条分界线：与 6 条绿线同色（绿），E0→E3 线宽加宽 3 倍
+  if(E0){
+    [E1,E2,E3].forEach((E,idx)=>{
+      if(E){
+        const w = (idx===2) ? lw*1.3*3 : lw*1.3;
+        g+='<line x1="'+E0[0].toFixed(1)+'" y1="'+E0[1].toFixed(1)+'" x2="'+E[0].toFixed(1)+'" y2="'+E[1].toFixed(1)+
+           '" stroke="#1a7f37" stroke-width="'+w.toFixed(2)+'"/>';
+      }
+    });
+  }
+
+  g+='<line x1="'+A2end[0].toFixed(1)+'" y1="'+A2end[1].toFixed(1)+'" x2="'+arrowUp[0].toFixed(1)+'" y2="'+arrowUp[1].toFixed(1)+
+     '" stroke="#d81b1b" stroke-width="'+(lw*1.0).toFixed(2)+'"/>';
+  g+='<line x1="'+A3end[0].toFixed(1)+'" y1="'+A3end[1].toFixed(1)+'" x2="'+arrowDn[0].toFixed(1)+'" y2="'+arrowDn[1].toFixed(1)+
+     '" stroke="#d81b1b" stroke-width="'+(lw*1.0).toFixed(2)+'"/>';
+
+  const GREEN='#1a7f37';
+  const greenLines=[];
+  for(let i=0;i<3;i++){
+    const r=G.res[i];
+    if(i===0 || i===1){
+      greenLines.push([r.w2aU, r.V12]);
+      greenLines.push([r.w3aU, r.V23]);
+    }
+    if(i===2){
+      greenLines.push([r.V12, r.V12U]);
+      greenLines.push([r.V23, r.V23U]);
+    }
+  }
+  greenLines.forEach(([A,B])=>{
+    g+='<line x1="'+A[0].toFixed(1)+'" y1="'+A[1].toFixed(1)+'" x2="'+B[0].toFixed(1)+'" y2="'+B[1].toFixed(1)+
+       '" stroke="'+GREEN+'" stroke-width="'+(lw*1.4).toFixed(2)+'"/>';
+  });
+  for(let i=0;i<3;i++){
+    const r=G.res[i];
+    const pts=(i===2) ? [r.V12,r.V12U,r.V23,r.V23U] : [r.w2aU,r.V12,r.w3aU,r.V23];
+    pts.forEach(q=>{
+      g+='<circle cx="'+q[0].toFixed(1)+'" cy="'+q[1].toFixed(1)+'" r="'+(lw*1.4).toFixed(2)+'" fill="'+GREEN+'"/>';
+    });
+  }
+
+  for(let i=0;i<3;i++){
+    const p=G.pipes[i], Dp=[p.C1[0]+p.a1*p.u1[0],p.C1[1]+p.a1*p.u1[1]];
+    g+='<text x="'+Dp[0].toFixed(1)+'" y="'+(Dp[1]+p.R1*1.5).toFixed(1)+'" font-size="'+(fs*0.9).toFixed(1)+
+       '" fill="#1f3a5f" stroke="#ffffff" stroke-width="'+(lw*1.4).toFixed(2)+'" paint-order="stroke" text-anchor="middle">'+dsc[i]+'</text>';
+  }
+
+  function drawAngleArc(O, angA, angB, rArc, symbol, fs, lw, labelSide, arrowLen, flipStart, flipEnd){
+    const color = '#1a5fb4';
+    let diff = angB - angA;
+    while(diff > Math.PI) diff -= 2*Math.PI;
+    while(diff < -Math.PI) diff += 2*Math.PI;
+    const aStart = angA;
+    const aEnd = angA + diff;
+    const midAng = angA + diff/2;
+
+    const S = [O[0]+rArc*Math.cos(aStart), O[1]+rArc*Math.sin(aStart)];
+    const E = [O[0]+rArc*Math.cos(aEnd),   O[1]+rArc*Math.sin(aEnd)];
+    const largeArc = Math.abs(diff) > Math.PI ? 1 : 0;
+    const sweep = diff > 0 ? 1 : 0;
+
+    let s = '<path d="M '+S[0].toFixed(2)+' '+S[1].toFixed(2)+
+            ' A '+rArc.toFixed(2)+' '+rArc.toFixed(2)+' 0 '+largeArc+' '+sweep+' '+
+            E[0].toFixed(2)+' '+E[1].toFixed(2)+
+            '" fill="none" stroke="'+color+'" stroke-width="'+lw.toFixed(2)+'"/>';
+
+    const arrowWide = arrowLen / 12;
+
+    function arrowAt(P, angRad, outwardSign){
+      const nx = Math.cos(angRad), ny = Math.sin(angRad);
+      const tx = outwardSign>0 ? -ny : ny;
+      const ty = outwardSign>0 ?  nx : -nx;
+      const tipX = P[0], tipY = P[1];
+      const baseMidX = P[0] + tx*arrowLen;
+      const baseMidY = P[1] + ty*arrowLen;
+      const b1x = baseMidX + nx*arrowWide;
+      const b1y = baseMidY + ny*arrowWide;
+      const b2x = baseMidX - nx*arrowWide;
+      const b2y = baseMidY - ny*arrowWide;
+      return '<path d="M '+tipX.toFixed(2)+' '+tipY.toFixed(2)+
+             ' L '+b1x.toFixed(2)+' '+b1y.toFixed(2)+
+             ' L '+b2x.toFixed(2)+' '+b2y.toFixed(2)+' Z" fill="'+color+'"/>';
+    }
+    let startOutwardSign = diff>0 ? -1 : +1;
+    if(flipStart) startOutwardSign = -startOutwardSign;
+    let endOutwardSign = diff>0 ? +1 : -1;
+    if(flipEnd) endOutwardSign = -endOutwardSign;
+    s += arrowAt(S, aStart, startOutwardSign);
+    s += arrowAt(E, aEnd,   endOutwardSign);
+
+    const side = (labelSide===undefined) ? -1 : labelSide;
+    const inR = rArc + side*fs*1.25;
+    const TP = [O[0]+inR*Math.cos(midAng), O[1]+inR*Math.sin(midAng)];
+    s += '<text x="'+TP[0].toFixed(1)+'" y="'+TP[1].toFixed(1)+'" '+
+         'font-size="'+fs.toFixed(1)+'" fill="'+color+'" font-weight="bold" '+
+         'stroke="#ffffff" stroke-width="'+(lw*1.6).toFixed(2)+'" paint-order="stroke" '+
+         'text-anchor="middle" dominant-baseline="middle">'+symbol+'</text>';
+    return s;
+  }
+
+  (function(){
+    const O=[0,0];
+    const angS = Math.atan2(a23mid[1], a23mid[0]);
+    const u3=G.pipes[2].u3;
+    const angE=Math.atan2(u3[1],u3[0]);
+    g += drawAngleArc(O, angS, angE, rBeta, 'β', fs*1.05, lw*1.05, -1, rAlpha0*0.05, true, true);
+  })();
+
+  (function(){
+    const angA = Math.atan2(u3dir[1], u3dir[0]);
+    const angB = Math.atan2(u2dir[1], u2dir[0]);
+    g += drawAngleArc(Valpha, angA, angB, rAlpha0, 'α0', fs*1.05, lw*1.05, -1, rAlpha0*0.05, true, true);
+  })();
+
+  const svg=document.getElementById('fig');
+  svg.setAttribute('viewBox', x0.toFixed(0)+' '+y0.toFixed(0)+' '+W.toFixed(0)+' '+H.toFixed(0));
+  svg.setAttribute('preserveAspectRatio','xMidYMid meet');
+  svg.innerHTML=g;
+
+  LAST_G=G; LAST_P=P;
+}
+
+function run(){
+  refreshOpt(false);
+  const P=readInputs();
+  const G=solve(P);
+  fillAdv(G);
+  renderOutput(G,P);
+  renderFig(G,P);
+}
+
+/* ==================== DXF 导出 ==================== */
+function exportDXF(){
+  if(!LAST_G){ alert('请先点击「计算并绘制」生成图形'); return; }
+  const G=LAST_G, P=LAST_P;
+  const Rs=G.Rs;
+  const L=(c,v)=>c+'\n'+v+'\n';
+  const entities=[];
+
+  const addLine=(layer,p1,p2)=>entities.push({type:'LINE',layer,p1,p2});
+  const addCircle=(layer,c,r)=>entities.push({type:'CIRCLE',layer,c,r});
+  const addText=(layer,p,h,s)=>entities.push({type:'TEXT',layer,p,h,s});
+
+  // ---- 关键点 ----
+  const yTop=-Rs;
+  const wl  = i => [G.res[i].w3a, G.res[i].w3b];
+  const wlu = i => {const p=G.pipes[i];
+    return [[p.C2[0]+p.R2*p.n3up[0],p.C2[1]+p.R2*p.n3up[1]],
+            [p.O[0]+Rs*p.n3up[0],p.O[1]+Rs*p.n3up[1]]];};
+  const L13=wl(0), L23=wl(1), L33L=wl(2), L33R=wlu(2);
+
+  const p13 = inter(L13[0],L13[1],L33L[0],L33L[1]);
+  const E5  = inter(L13[0],L13[1],L23[0],L23[1]);
+  const E3  = inter(L23[0],L23[1],L33R[0],L33R[1]);
+  const E1  = [0,yTop];
+  const E4  = inter(L33R[0],L33R[1],[-1,yTop],[1,yTop]);
+  const E2  = p13;
+  const E0  = inter(E1,E5,E2,E4);
+
+  // ---- 管节轮廓 ----
+  G.pipes.forEach((p,i)=>{
+    const r=G.res[i];
+    let lo, up;
+    if(i===0){
+      lo=[r.corner, r.V12, r.V23, p13];
+      up=[r.cornerUp, r.V12U, r.V23U, E1];
+    } else if(i===1){
+      lo=[r.corner, r.V12, r.V23, E3];
+      up=[r.cornerUp, r.V12U, r.V23U, E1];
+    } else {
+      lo=[r.corner, r.V12, r.V23, p13];
+      up=[r.cornerUp, r.V12U, r.V23U, E3];
+    }
+    for(let k=0;k<lo.length-1;k++) addLine('WALL', lo[k], lo[k+1]);
+    for(let k=0;k<up.length-1;k++) addLine('WALL', up[k], up[k+1]);
+    // 管节端线（外端封口）
+    if(dist(r.cornerUp, r.corner)>1e-6) addLine('WALL', r.cornerUp, r.corner);
+  });
+
+  // ---- 内切圆 + 公切圆 ----
+  for(let i=0;i<3;i++){
+    const p=G.pipes[i];
+    addCircle('WALL_INNER', p.C1, p.R1);
+    addCircle('WALL_INNER', p.C2, p.R2);
+  }
+  addCircle('WALL_INNER', [0,0], Rs);
+
+  // ---- 轴线 ----
+  for(let i=0;i<3;i++){
+    const p=G.pipes[i];
+    const E=[p.C1[0]+p.a1*p.u1[0],p.C1[1]+p.a1*p.u1[1]];
+    addLine('AXIS', E, p.C1);
+    addLine('AXIS', p.C1, p.C2);
+    addLine('AXIS', p.C2, [0,0]);
+  }
+
+  const p2=G.pipes[1], p3=G.pipes[2];
+  const A2end=[p2.C1[0]+p2.a1*p2.u1[0], p2.C1[1]+p2.a1*p2.u1[1]];
+  const A3end=[p3.C1[0]+p3.a1*p3.u1[0], p3.C1[1]+p3.a1*p3.u1[1]];
+  const A2mid=[(p2.C1[0]+A2end[0])/2,(p2.C1[1]+A2end[1])/2];
+  const A3mid=[(p3.C1[0]+A3end[0])/2,(p3.C1[1]+A3end[1])/2];
+  const u2v=p2.u1, u3v=p3.u1;
+  const denA=u2v[0]*(-u3v[1])-u2v[1]*(-u3v[0]);
+  let Valpha;
+  if(Math.abs(denA)<1e-12){
+    Valpha=[(A2end[0]+A3end[0])/2,(A2end[1]+A3end[1])/2];
+  } else {
+    const rx=A3end[0]-A2end[0], ry=A3end[1]-A2end[1];
+    const t=(rx*(-u3v[1])-ry*(-u3v[0]))/denA;
+    Valpha=[A2end[0]+t*u2v[0], A2end[1]+t*u2v[1]];
+  }
+  const rAlpha0=dist(Valpha,A2mid);
+  const dir3=[A3mid[0]-Valpha[0],A3mid[1]-Valpha[1]];
+  const len3=Math.hypot(dir3[0],dir3[1])||1;
+  const u3dir=[dir3[0]/len3,dir3[1]/len3];
+  const arrowDn=[Valpha[0]+rAlpha0*u3dir[0],Valpha[1]+rAlpha0*u3dir[1]];
+  addLine('AXIS_EXT', A2end, A2mid);
+  addLine('AXIS_EXT', A3end, arrowDn);
+
+  // ---- 6 条绿线（CONNECT）----
+  for(let i=0;i<3;i++){
+    const r=G.res[i];
+    if(i===0 || i===1){
+      addLine('CONNECT', r.w2aU, r.V12);
+      addLine('CONNECT', r.w3aU, r.V23);
+    }
+    if(i===2){
+      addLine('CONNECT', r.V12, r.V12U);
+      addLine('CONNECT', r.V23, r.V23U);
+    }
+  }
+
+  // ---- 3 条分界线（与 6 条绿线同层同色）----
+  if(E0){
+    [E1,E2,E3].forEach(E=>{ if(E) addLine('CONNECT', E0, E); });
+  }
+
+  // ---- 管段名称文字 ----
+  for(let i=0;i<3;i++){
+    const p=G.pipes[i];
+    const Dp=[p.C1[0]+p.a1*p.u1[0], p.C1[1]+p.a1*p.u1[1]];
+    const tp=[Dp[0], Dp[1]+p.R1*1.5];
+    const name=(i===0)?'DI1':(i===1)?'DI2':'DI3';
+    addText('TEXT', tp, 60, name);
+  }
+
+  let dxf='';
+  dxf+=L(0,'SECTION'); dxf+=L(2,'HEADER');
+  dxf+=L(9,'$ACADVER'); dxf+=L(1,'AC1009');
+  dxf+=L(9,'$INSUNITS'); dxf+=L(70,4);
+  dxf+=L(9,'$EXTMIN'); dxf+=L(10,0); dxf+=L(20,0); dxf+=L(30,0);
+  dxf+=L(9,'$EXTMAX'); dxf+=L(10,10000); dxf+=L(20,10000); dxf+=L(30,0);
+  dxf+=L(0,'ENDSEC');
+
+  dxf+=L(0,'SECTION'); dxf+=L(2,'TABLES');
+  dxf+=L(0,'TABLE'); dxf+=L(2,'LTYPE'); dxf+=L(70,3);
+  dxf+=L(0,'LTYPE'); dxf+=L(2,'CONTINUOUS'); dxf+=L(70,0);
+  dxf+=L(3,'Solid line'); dxf+=L(72,65); dxf+=L(73,0); dxf+=L(40,0.0);
+  dxf+=L(0,'LTYPE'); dxf+=L(2,'DASHED'); dxf+=L(70,0);
+  dxf+=L(3,'Dashed __ __ __'); dxf+=L(72,65); dxf+=L(73,2); dxf+=L(40,15.0);
+  dxf+=L(49,10.0); dxf+=L(49,-5.0);
+  dxf+=L(0,'LTYPE'); dxf+=L(2,'CENTER'); dxf+=L(70,0);
+  dxf+=L(3,'Center ____ _ ____'); dxf+=L(72,65); dxf+=L(73,4); dxf+=L(40,50.0);
+  dxf+=L(49,30.0); dxf+=L(49,-5.0); dxf+=L(49,5.0); dxf+=L(49,-5.0);
+  dxf+=L(0,'ENDTAB');
+
+  dxf+=L(0,'TABLE'); dxf+=L(2,'LAYER'); dxf+=L(70,7);
+  const layerDefs=[
+    ['WALL',7,'CONTINUOUS'],
+    ['WALL_INNER',8,'DASHED'],
+    ['AXIS',1,'CENTER'],
+    ['AXIS_EXT',1,'CONTINUOUS'],
+    ['DIM',5,'CONTINUOUS'],
+    ['TEXT',3,'CONTINUOUS'],
+    ['CONNECT',3,'CONTINUOUS']
+  ];
+  layerDefs.forEach(([name,color,ltype])=>{
+    dxf+=L(0,'LAYER'); dxf+=L(2,name); dxf+=L(70,0); dxf+=L(62,color); dxf+=L(6,ltype);
+  });
+  dxf+=L(0,'ENDTAB');
+  dxf+=L(0,'ENDSEC');
+
+  dxf+=L(0,'SECTION'); dxf+=L(2,'ENTITIES');
+  entities.forEach(e=>{
+    if(e.type==='LINE'){
+      dxf+=L(0,'LINE'); dxf+=L(8,e.layer);
+      dxf+=L(10,e.p1[0].toFixed(4)); dxf+=L(20,e.p1[1].toFixed(4)); dxf+=L(30,'0.0');
+      dxf+=L(11,e.p2[0].toFixed(4)); dxf+=L(21,e.p2[1].toFixed(4)); dxf+=L(31,'0.0');
+    } else if(e.type==='CIRCLE'){
+      dxf+=L(0,'CIRCLE'); dxf+=L(8,e.layer);
+      dxf+=L(10,e.c[0].toFixed(4)); dxf+=L(20,e.c[1].toFixed(4)); dxf+=L(30,'0.0');
+      dxf+=L(40,e.r.toFixed(4));
+    } else if(e.type==='TEXT'){
+      dxf+=L(0,'TEXT'); dxf+=L(8,e.layer);
+      dxf+=L(10,e.p[0].toFixed(4)); dxf+=L(20,e.p[1].toFixed(4)); dxf+=L(30,'0.0');
+      dxf+=L(40,e.h.toFixed(4)); dxf+=L(1,e.s);
+    }
+  });
+  dxf+=L(0,'ENDSEC');
+  dxf+=L(0,'EOF');
+
+  const blob=new Blob([dxf],{type:'application/dxf'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download='月牙肋岔管_'+P.D1+'x'+P.D2+'x'+P.D3+'_a0='+f2(P.alpha0)+'.dxf';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(()=>{document.body.removeChild(a); URL.revokeObjectURL(url);}, 200);
+}
+
+buildAdv();
+run();
+</script>
+</body>
+</html>
